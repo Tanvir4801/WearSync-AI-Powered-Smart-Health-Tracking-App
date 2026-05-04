@@ -1,0 +1,22 @@
+{
+	"flutter": {
+		"platforms": {
+			"ios": {
+				"default": {
+					"projectId": "wearsync-28d30",
+					"appId": "1:768914772567:ios:14b3268e4e33c59f32c912",
+					"uploadDebugSymbols": false,
+					"fileOutput": "ios/Runner/GoogleService-Info.plist"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "wearsync-28d30",
+					"configurations": {
+						"ios": "1:768914772567:ios:14b3268e4e33c59f32c912"
+					}
+				}
+			}
+		}
+	}
+}

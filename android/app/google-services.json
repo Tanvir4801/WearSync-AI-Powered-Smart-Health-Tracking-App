@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "768914772567",
+    "project_id": "wearsync-28d30",
+    "storage_bucket": "wearsync-28d30.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:768914772567:android:fa629049e63450f532c912",
+        "android_client_info": {
+          "package_name": "com.example.smartwear_ai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "768914772567-gg2onqkfe1hu92c4a1qqdu6fhsooiva1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smartwear_ai",
+            "certificate_hash": "ad625adf251eaee70339d7fc2320d4762ecc4769"
+          }
+        },
+        {
+          "client_id": "768914772567-9trd9kcp7umir3mcrecprgtr4e47tsre.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCE2GL9nnsGW_JG3VNF1g3QC4ZWwCDxUsA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "768914772567-9trd9kcp7umir3mcrecprgtr4e47tsre.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "768914772567-dppqom8jt28ojgci2ou9g6dt3vha1s36.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "WearSync"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
