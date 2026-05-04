@@ -22,17 +22,15 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 
 Chat now calls Hugging Face directly from Flutter via `getAIResponse(String message)`.
 
-Run with API key via dart-define:
+Add your Hugging Face API key to a `.env` file (do NOT commit it). You can
+use `.env.example` as a template.
 
 ```bash
+cp .env.example .env
+# edit .env and set HF_API_KEY
 flutter pub get
-flutter run --dart-define=HF_API_KEY=YOUR_HF_API_KEY
+flutter run
 ```
 
-### One-Time Local Setup (No Long Command Each Run)
-
-1. Copy `.vscode/hf.local.json.example` to `.vscode/hf.local.json`.
-2. Put your key in `HF_API_KEY`.
-3. Run from VS Code launch config: **Flutter (Hugging Face Direct)**.
-
-After this, you can run from the play button without retyping the API argument.
+Alternatively you can still use `--dart-define` or the VS Code launch config,
+but `.env` is the recommended approach for local development.
