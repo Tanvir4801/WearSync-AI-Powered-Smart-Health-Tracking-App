@@ -46,127 +46,145 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ref.watch(weeklySummaryProvider);
     final AsyncValue<List<AchievementStatus>> achievements =
         ref.watch(achievementsProvider);
+    final WeeklySummaryData? summaryData = summary.valueOrNull;
+    final UserProfileInfo? userInfoData = userInfo.valueOrNull;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              userInfo.when(
-                data: (UserProfileInfo info) => _HeroHeader(
-                  info: info,
-                  onAvatarTap: _pickAndSaveProfilePhoto,
-                  onEditTap: () => _showEditProfileSheet(info),
-                ),
-                loading: () => const SizedBox(
-                  height: 220,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (_, __) => const SizedBox.shrink(),
+      body: Stack(
+        children: <Widget>[
+          const _ProfileBackgroundGlow(),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  userInfo.when(
+                    data: (UserProfileInfo info) => _HeroHeader(
+                      info: info,
+                      avgDailySteps: summaryData?.avgDailySteps,
+                      onAvatarTap: _pickAndSaveProfilePhoto,
+                      onEditTap: () => _showEditProfileSheet(info),
+                    ),
+                    loading: () => const SizedBox(
+                      height: 240,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  if (summaryData != null) ...<Widget>[
+                    const SizedBox(height: 16),
+                    _WeeklySnapshotCard(
+                      data: summaryData,
+                      userInfo: userInfoData,
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  summary.when(
+                    data: (WeeklySummaryData data) => _HealthProfileSection(
+                      userInfo: userInfo.value,
+                      avgDailySteps: data.avgDailySteps,
+                      onAddTap: () {
+                        if (userInfo.value != null) {
+                          _showEditProfileSheet(userInfo.value!);
+                        }
+                      },
+                    ),
+                    loading: () => const SizedBox(
+                      height: 120,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 24),
+                  summary.when(
+                    data: (WeeklySummaryData data) =>
+                        _WeeklySummarySection(data: data),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 24),
+                  achievements.when(
+                    data: (List<AchievementStatus> data) =>
+                        _AchievementsSection(
+                      achievements: data,
+                      onSeeAll: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                AchievementsScreen(achievements: data),
+                          ),
+                        );
+                      },
+                      onTapAchievement: _showAchievementDialog,
+                    ),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 24),
+                  _SettingsSection(
+                    profile: profile,
+                    appVersionFuture: _appVersionFuture,
+                    onDailyGoalChange: (int goal) => ref
+                        .read(profileControllerProvider.notifier)
+                        .setDailyGoal(goal),
+                    onDemoModeChange: (bool enabled) {
+                      ref
+                          .read(profileControllerProvider.notifier)
+                          .setDemoMode(enabled);
+                      ref.read(demomodeProvider.notifier).state = enabled;
+                      ref.invalidate(homeControllerProvider);
+                      ref.invalidate(activityProvider);
+                      ref.invalidate(weeklySummaryProvider);
+                    },
+                    onNotificationsChange: (bool enabled) => ref
+                        .read(profileControllerProvider.notifier)
+                        .setNotificationsEnabled(enabled),
+                    onWaterReminderChange: (int minutes) => ref
+                        .read(profileControllerProvider.notifier)
+                        .setWaterReminder(minutes),
+                    onStepUnitChange: (StepUnit unit) => ref
+                        .read(profileControllerProvider.notifier)
+                        .setStepUnit(unit),
+                    onExportData: () {
+                      _exportHealthData();
+                    },
+                    onClearChat: () {
+                      ref.read(chatControllerProvider.notifier).clearMessages();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Chat history cleared.')),
+                      );
+                    },
+                    onDeleteAccount: () {
+                      _confirmDeleteAccount();
+                    },
+                    onRateApp: () {
+                      _launchExternal(
+                        Uri.parse(
+                            'https://play.google.com/store/apps/details?id=com.wearsync.app'),
+                      );
+                    },
+                    onPrivacyPolicy: () {
+                      _launchExternal(
+                          Uri.parse('https://wearsync.app/privacy'));
+                    },
+                    onContactSupport: () {
+                      _launchExternal(
+                        Uri.parse(
+                            'mailto:support@wearsync.app?subject=WearSync%20Support'),
+                      );
+                    },
+                    onSignOut: () {
+                      _showSignOutConfirmation();
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ),
-              const SizedBox(height: 24),
-              summary.when(
-                data: (WeeklySummaryData data) => _HealthProfileSection(
-                  userInfo: userInfo.value,
-                  avgDailySteps: data.avgDailySteps,
-                  onAddTap: () {
-                    if (userInfo.value != null) {
-                      _showEditProfileSheet(userInfo.value!);
-                    }
-                  },
-                ),
-                loading: () => const SizedBox(
-                  height: 120,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-              const SizedBox(height: 24),
-              summary.when(
-                data: (WeeklySummaryData data) =>
-                    _WeeklySummarySection(data: data),
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-              const SizedBox(height: 24),
-              achievements.when(
-                data: (List<AchievementStatus> data) => _AchievementsSection(
-                  achievements: data,
-                  onSeeAll: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => AchievementsScreen(achievements: data),
-                      ),
-                    );
-                  },
-                  onTapAchievement: _showAchievementDialog,
-                ),
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-              const SizedBox(height: 24),
-              _SettingsSection(
-                profile: profile,
-                appVersionFuture: _appVersionFuture,
-                onDailyGoalChange: (int goal) => ref
-                    .read(profileControllerProvider.notifier)
-                    .setDailyGoal(goal),
-                onDemoModeChange: (bool enabled) {
-                  ref
-                      .read(profileControllerProvider.notifier)
-                      .setDemoMode(enabled);
-                  ref.read(demomodeProvider.notifier).state = enabled;
-                  ref.invalidate(homeControllerProvider);
-                  ref.invalidate(activityProvider);
-                  ref.invalidate(weeklySummaryProvider);
-                },
-                onNotificationsChange: (bool enabled) => ref
-                    .read(profileControllerProvider.notifier)
-                    .setNotificationsEnabled(enabled),
-                onWaterReminderChange: (int minutes) => ref
-                    .read(profileControllerProvider.notifier)
-                    .setWaterReminder(minutes),
-                onStepUnitChange: (StepUnit unit) => ref
-                    .read(profileControllerProvider.notifier)
-                    .setStepUnit(unit),
-                onExportData: () {
-                  _exportHealthData();
-                },
-                onClearChat: () {
-                  ref.read(chatControllerProvider.notifier).clearMessages();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Chat history cleared.')),
-                  );
-                },
-                onDeleteAccount: () {
-                  _confirmDeleteAccount();
-                },
-                onRateApp: () {
-                  _launchExternal(
-                    Uri.parse(
-                        'https://play.google.com/store/apps/details?id=com.wearsync.app'),
-                  );
-                },
-                onPrivacyPolicy: () {
-                  _launchExternal(Uri.parse('https://wearsync.app/privacy'));
-                },
-                onContactSupport: () {
-                  _launchExternal(
-                    Uri.parse(
-                        'mailto:support@wearsync.app?subject=WearSync%20Support'),
-                  );
-                },
-                onSignOut: () {
-                  _showSignOutConfirmation();
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -308,6 +326,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   'weightKg': weightKg ?? FieldValue.delete(),
                                   'heightCm': heightCm ?? FieldValue.delete(),
                                 };
+                                final NavigatorState bottomSheetNavigator =
+                                    Navigator.of(context);
 
                                 setState(() => isSaving = true);
                                 bool didCloseSheet = false;
@@ -348,7 +368,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   }
 
                                   didCloseSheet = true;
-                                  Navigator.of(context).pop();
+                                  bottomSheetNavigator.pop();
                                   ref.invalidate(userProfileInfoProvider);
                                   ScaffoldMessenger.of(this.context)
                                       .showSnackBar(
@@ -564,6 +584,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onPressed: isProcessing
                       ? null
                       : () async {
+                          final NavigatorState dialogNavigator =
+                              Navigator.of(dialogContext);
                           setState(() => isProcessing = true);
                           await FirebaseAuth.instance.signOut();
                           if (!mounted) {
@@ -575,7 +597,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ref.invalidate(profileControllerProvider);
                           ref.invalidate(weeklySummaryProvider);
                           ref.invalidate(userProfileInfoProvider);
-                          Navigator.of(dialogContext).pop();
+                          dialogNavigator.pop();
                           this.context.go('/login');
                         },
                   child: isProcessing
@@ -621,11 +643,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 class _HeroHeader extends StatelessWidget {
   const _HeroHeader({
     required this.info,
+    required this.avgDailySteps,
     required this.onAvatarTap,
     required this.onEditTap,
   });
 
   final UserProfileInfo info;
+  final int? avgDailySteps;
   final VoidCallback onAvatarTap;
   final VoidCallback onEditTap;
 
@@ -649,112 +673,397 @@ class _HeroHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 220),
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        gradient: RadialGradient(
-          center: Alignment(0, -0.2),
-          radius: 1.1,
-          colors: <Color>[Color(0xFF1E293B), Color(0xFF0F172A)],
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color(0xFF172554),
+            Color(0xFF0F172A),
+            Color(0xFF111827)
+          ],
         ),
+        border:
+            Border.all(color: const Color(0xFF334155).withValues(alpha: 0.6)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: const Color(0xFF020617).withValues(alpha: 0.4),
+            blurRadius: 30,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Stack(
         children: <Widget>[
-          Align(
-            alignment: Alignment.topRight,
-            child: OutlinedButton(
-              onPressed: onEditTap,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF334155)),
-                minimumSize: const Size(90, 30),
+          Positioned(
+            right: -30,
+            top: -24,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF22D3EE).withValues(alpha: 0.09),
               ),
-              child: const Text('Edit Profile'),
             ),
           ),
-          Align(
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                GestureDetector(
-                  onTap: onAvatarTap,
-                  child: Container(
-                    width: 88,
-                    height: 88,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: <Color>[Color(0xFF6366F1), Color(0xFF22D3EE)],
-                      ),
-                    ),
+          Positioned(
+            left: -40,
+            bottom: -34,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  _ProfilePill(
+                    icon: Icons.verified_rounded,
+                    label: 'Member since',
+                    value: memberSince,
+                  ),
+                  const Spacer(),
+                  FilledButton.tonalIcon(
+                    onPressed: onEditTap,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  GestureDetector(
+                    onTap: onAvatarTap,
                     child: Container(
-                      width: 84,
-                      height: 84,
+                      width: 92,
+                      height: 92,
+                      padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
-                          colors: <Color>[Color(0xFF6366F1), Color(0xFF22D3EE)],
+                          colors: <Color>[Color(0xFF22D3EE), Color(0xFF6366F1)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        image: avatarImage == null
-                            ? null
-                            : DecorationImage(
-                                image: avatarImage, fit: BoxFit.cover),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color:
+                                const Color(0xFF22D3EE).withValues(alpha: 0.18),
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                      child: avatarImage == null
-                          ? Center(
-                              child: Text(
-                                initials.isEmpty ? 'U' : initials,
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF0F172A),
+                          image: avatarImage == null
+                              ? null
+                              : DecorationImage(
+                                  image: avatarImage, fit: BoxFit.cover),
+                        ),
+                        child: avatarImage == null
+                            ? Center(
+                                child: Text(
+                                  initials.isEmpty ? 'U' : initials,
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : null,
+                              )
+                            : null,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  info.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  info.email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style:
-                      const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    'Member since $memberSince',
-                    style: const TextStyle(
-                      color: Color(0xFF22D3EE),
-                      fontSize: 11,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          info.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          info.email,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Tap the avatar to change your photo.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: <Widget>[
+                  if (info.age != null)
+                    _ProfileStatChip(
+                      label: 'Age',
+                      value: '${info.age}',
+                      icon: Icons.cake_outlined,
+                    ),
+                  if (info.weightKg != null)
+                    _ProfileStatChip(
+                      label: 'Weight',
+                      value: '${info.weightKg!.toStringAsFixed(1)} kg',
+                      icon: Icons.monitor_weight_outlined,
+                    ),
+                  if (info.heightCm != null)
+                    _ProfileStatChip(
+                      label: 'Height',
+                      value: '${info.heightCm!.toStringAsFixed(1)} cm',
+                      icon: Icons.height_outlined,
+                    ),
+                  if (avgDailySteps != null)
+                    _ProfileStatChip(
+                      label: 'Avg steps',
+                      value: '$avgDailySteps',
+                      icon: Icons.directions_walk_rounded,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileBackgroundGlow extends StatelessWidget {
+  const _ProfileBackgroundGlow();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Stack(
+        children: <Widget>[
+          Positioned(
+            top: -90,
+            left: -40,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: <Color>[
+                    const Color(0xFF6366F1).withValues(alpha: 0.18),
+                    Colors.transparent,
+                  ],
                 ),
-              ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 240,
+            right: -60,
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: <Color>[
+                    const Color(0xFF22D3EE).withValues(alpha: 0.08),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileStatChip extends StatelessWidget {
+  const _ProfileStatChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(16),
+        border:
+            Border.all(color: const Color(0xFF334155).withValues(alpha: 0.8)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 16, color: const Color(0xFF22D3EE)),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF94A3B8),
+                  height: 1.1,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  height: 1.15,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklySnapshotCard extends StatelessWidget {
+  const _WeeklySnapshotCard({
+    required this.data,
+    required this.userInfo,
+  });
+
+  final WeeklySummaryData data;
+  final UserProfileInfo? userInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final double? bmi = _bmi(userInfo?.weightKg, userInfo?.heightCm);
+    final _BmiInfo bmiInfo = _bmiInfo(bmi);
+
+    return GlassmorphismCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const _SectionHeader(
+            title: 'Weekly Snapshot',
+            subtitle: 'A quick overview of your activity and body metrics.',
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              final bool compact = constraints.maxWidth < 330;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: <Widget>[
+                  _SnapshotTile(
+                    icon: Icons.directions_walk_rounded,
+                    label: 'Average steps',
+                    value: '${data.avgDailySteps}',
+                    accent: const Color(0xFF6366F1),
+                    compact: compact,
+                  ),
+                  _SnapshotTile(
+                    icon: Icons.emoji_events_outlined,
+                    label: 'Best day',
+                    value: '${data.bestDay}',
+                    accent: const Color(0xFFFBBF24),
+                    compact: compact,
+                  ),
+                  _SnapshotTile(
+                    icon: Icons.favorite_rounded,
+                    label: 'BMI',
+                    value: bmi == null ? '--' : bmi.toStringAsFixed(1),
+                    accent: bmiInfo.color,
+                    compact: compact,
+                    subtitle: bmiInfo.label,
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfilePill extends StatelessWidget {
+  const _ProfilePill({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: const Color(0xFF334155).withValues(alpha: 0.8),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 15, color: const Color(0xFF22D3EE)),
+          const SizedBox(width: 8),
+          Text(
+            '$label $value',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
         ],
@@ -783,95 +1092,170 @@ class _HealthProfileSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('My Health Profile',
-            style: Theme.of(context).textTheme.titleLarge),
+        const _SectionHeader(
+          title: 'My Health Profile',
+          subtitle: 'Body stats and activity level at a glance.',
+        ),
         const SizedBox(height: 12),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: GlassmorphismCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text('Body Stats',
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 8),
-                    Text('Age: ${userInfo?.age?.toString() ?? '--'}'),
-                    Text(
-                        'Weight: ${userInfo?.weightKg?.toStringAsFixed(1) ?? '--'} kg'),
-                    Text(
-                        'Height: ${userInfo?.heightCm?.toStringAsFixed(1) ?? '--'} cm'),
-                    Row(
+        LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final bool stacked = constraints.maxWidth < 620;
+            final Widget bodyStatsCard = _ProfileCard(
+              title: 'Body Stats',
+              icon: Icons.accessibility_new_rounded,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _MetricRow(
+                      label: 'Age', value: userInfo?.age?.toString() ?? '--'),
+                  _MetricRow(
+                    label: 'Weight',
+                    value: userInfo?.weightKg?.toStringAsFixed(1) == null
+                        ? '--'
+                        : '${userInfo?.weightKg?.toStringAsFixed(1)} kg',
+                  ),
+                  _MetricRow(
+                    label: 'Height',
+                    value: userInfo?.heightCm?.toStringAsFixed(1) == null
+                        ? '--'
+                        : '${userInfo?.heightCm?.toStringAsFixed(1)} cm',
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: bmiInfo.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: bmiInfo.color.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: Row(
                       children: <Widget>[
-                        Text(
-                          'BMI: ${bmi == null ? '--' : bmi.toStringAsFixed(1)}',
-                          style: TextStyle(color: bmiInfo.color),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          bmiInfo.label,
-                          style: TextStyle(color: bmiInfo.color, fontSize: 12),
+                        Icon(Icons.monitor_weight_rounded,
+                            color: bmiInfo.color, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'BMI ${bmi == null ? '--' : bmi.toStringAsFixed(1)}',
+                                style: TextStyle(
+                                  color: bmiInfo.color,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                bmiInfo.label,
+                                style: TextStyle(
+                                  color: bmiInfo.color.withValues(alpha: 0.9),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    if (userInfo?.age == null ||
-                        userInfo?.weightKg == null ||
-                        userInfo?.heightCm == null)
-                      GestureDetector(
-                        onTap: onAddTap,
-                        child: const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: Text('Add',
-                              style: TextStyle(color: Color(0xFF22D3EE))),
+                  ),
+                  if (userInfo?.age == null ||
+                      userInfo?.weightKg == null ||
+                      userInfo?.heightCm == null) ...<Widget>[
+                    const SizedBox(height: 10),
+                    TextButton.icon(
+                      onPressed: onAddTap,
+                      icon: const Icon(Icons.add_circle_outline, size: 18),
+                      label: const Text('Add missing info'),
+                    ),
+                  ],
+                ],
+              ),
+            );
+
+            final Widget fitnessCard = _ProfileCard(
+              title: 'Fitness Level',
+              icon: Icons.fitness_center_rounded,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          fitnessInfo.color.withValues(alpha: 0.20),
+                          fitnessInfo.color.withValues(alpha: 0.08),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: fitnessInfo.color.withValues(alpha: 0.55),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          '${fitnessInfo.emoji} ${fitnessInfo.label}',
+                          style: TextStyle(
+                            color: fitnessInfo.color,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          fitnessInfo.description,
+                          style: const TextStyle(fontSize: 13, height: 1.35),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: <Widget>[
+                      const Icon(Icons.auto_graph_rounded,
+                          size: 16, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Based on your 7-day average of $avgDailySteps steps',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ),
                       ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GlassmorphismCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text('Fitness Level',
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: fitnessInfo.color.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: fitnessInfo.color),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            '${fitnessInfo.emoji} ${fitnessInfo.label}',
-                            style: TextStyle(
-                              color: fitnessInfo.color,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(fitnessInfo.description,
-                              style: const TextStyle(fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Based on your 7-day average',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            );
+
+            if (stacked) {
+              return Column(
+                children: <Widget>[
+                  bodyStatsCard,
+                  const SizedBox(height: 12),
+                  fitnessCard,
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(child: bodyStatsCard),
+                const SizedBox(width: 12),
+                Expanded(child: fitnessCard),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -888,7 +1272,10 @@ class _WeeklySummarySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Weekly Summary', style: Theme.of(context).textTheme.titleLarge),
+        const _SectionHeader(
+          title: 'Weekly Summary',
+          subtitle: 'Your 7-day trend in one place.',
+        ),
         const SizedBox(height: 12),
         GlassmorphismCard(
           child: Column(
@@ -1004,9 +1391,26 @@ class _AchievementsSection extends StatelessWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            Text('Achievements', style: Theme.of(context).textTheme.titleLarge),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('Achievements',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Unlocked by consistency and progress.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
             const Spacer(),
-            TextButton(onPressed: onSeeAll, child: const Text('See All')),
+            TextButton.icon(
+              onPressed: onSeeAll,
+              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+              label: const Text('See All'),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -1068,7 +1472,10 @@ class _SettingsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Settings', style: Theme.of(context).textTheme.titleLarge),
+        const _SectionHeader(
+          title: 'Settings',
+          subtitle: 'Customize goals, app behavior, and support.',
+        ),
         const SizedBox(height: 12),
         const _SectionLabel(title: 'Preferences'),
         const SizedBox(height: 8),
@@ -1149,11 +1556,11 @@ class _SettingsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        _SettingsTile(
+        const _SettingsTile(
           icon: Icons.dark_mode,
           title: 'Theme',
           subtitle: 'Dark',
-          trailing: const Icon(Icons.lock, size: 16),
+          trailing: Icon(Icons.lock, size: 16),
         ),
         const SizedBox(height: 8),
         FutureBuilder<String>(
@@ -1317,10 +1724,19 @@ class _SettingsTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: GlassmorphismCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: <Widget>[
-            Icon(icon, color: AppTheme.secondaryAccent),
-            const SizedBox(width: 12),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppTheme.secondaryAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: AppTheme.secondaryAccent),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1328,14 +1744,16 @@ class _SettingsTile extends StatelessWidget {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: titleColor,
+                          color: titleColor ?? Colors.white,
                         ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style:
-                        subtitleStyle ?? Theme.of(context).textTheme.bodySmall,
+                    style: subtitleStyle ??
+                        Theme.of(context).textTheme.bodySmall?.copyWith(
+                              height: 1.25,
+                            ),
                   ),
                 ],
               ),
@@ -1344,6 +1762,207 @@ class _SettingsTile extends StatelessWidget {
               const SizedBox(width: 8),
               trailing!,
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+        ),
+        if (subtitle != null) ...<Widget>[
+          const SizedBox(height: 3),
+          Text(
+            subtitle!,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF94A3B8),
+              height: 1.3,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassmorphismCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: const Color(0xFF1E293B),
+                ),
+                child: Icon(icon, color: const Color(0xFF22D3EE), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricRow extends StatelessWidget {
+  const _MetricRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: <Widget>[
+          Text(
+            '$label:',
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SnapshotTile extends StatelessWidget {
+  const _SnapshotTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+    required this.compact,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+  final bool compact;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: compact
+          ? double.infinity
+          : (MediaQuery.of(context).size.width - 64) / 3,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: accent.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: accent, size: 18),
+                ),
+                const Spacer(),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
           ],
         ),
       ),

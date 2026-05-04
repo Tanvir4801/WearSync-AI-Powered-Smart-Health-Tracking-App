@@ -174,27 +174,34 @@ Future<List<HealthData>> weekHealthData(Ref ref) async {
       DateTime.now().subtract(const Duration(days: 7));
   final String dateFilter = DateFormat('yyyy-MM-dd').format(sevenDaysAgo);
 
-  final QuerySnapshot<Map<String, dynamic>> docs = await FirebaseFirestore
-      .instance
-      .collection('users')
-      .doc(uid)
-      .collection('health')
-      .where('date', isGreaterThanOrEqualTo: dateFilter)
-      .get();
+  try {
+    final QuerySnapshot<Map<String, dynamic>> docs = await FirebaseFirestore
+        .instance
+        .collection('users')
+        .doc(uid)
+        .collection('health')
+        .where('date', isGreaterThanOrEqualTo: dateFilter)
+        .get();
 
-  return docs.docs.map((QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final Map<String, dynamic> data = doc.data();
-    return HealthData(
-      steps: (data['steps'] as num?)?.toInt() ?? 0,
-      calories: (data['calories'] as num?)?.toInt() ?? 0,
-      heartRateAvg: (data['heartRate'] as num?)?.toInt() ?? 0,
-      activeMinutes: (data['activeMinutes'] as num?)?.toInt() ?? 0,
-      waterGlasses:
-          ((data['water'] ?? data['waterGlasses']) as num?)?.toInt() ?? 0,
-      createdAt: _toDateTime(data['createdAt']) ?? DateTime.now(),
-      updatedAt: _toDateTime(data['updatedAt']) ?? DateTime.now(),
-    );
-  }).toList();
+    return docs.docs.map((QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final Map<String, dynamic> data = doc.data();
+      return HealthData(
+        steps: (data['steps'] as num?)?.toInt() ?? 0,
+        calories: (data['calories'] as num?)?.toInt() ?? 0,
+        heartRateAvg: (data['heartRate'] as num?)?.toInt() ?? 0,
+        activeMinutes: (data['activeMinutes'] as num?)?.toInt() ?? 0,
+        waterGlasses:
+            ((data['water'] ?? data['waterGlasses']) as num?)?.toInt() ?? 0,
+        createdAt: _toDateTime(data['createdAt']) ?? DateTime.now(),
+        updatedAt: _toDateTime(data['updatedAt']) ?? DateTime.now(),
+      );
+    }).toList();
+  } on FirebaseException catch (error) {
+    if (_isFirestoreUnavailable(error)) {
+      return <HealthData>[];
+    }
+    rethrow;
+  }
 }
 
 final FutureProvider<UserProfileInfo> userProfileInfoProvider =
@@ -211,9 +218,22 @@ final FutureProvider<UserProfileInfo> userProfileInfoProvider =
     );
   }
 
-  final DocumentSnapshot<Map<String, dynamic>> doc =
-      await FirebaseFirestore.instance.collection('users').doc(uid).get();
-  final Map<String, dynamic> data = doc.data() ?? <String, dynamic>{};
+  final Map<String, dynamic> data;
+  try {
+    final DocumentSnapshot<Map<String, dynamic>> doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    data = doc.data() ?? <String, dynamic>{};
+  } on FirebaseException catch (error) {
+    if (_isFirestoreUnavailable(error)) {
+      return UserProfileInfo(
+        displayName: auth.currentUser?.displayName ?? 'User',
+        email: auth.currentUser?.email ?? '',
+        photoUrl: '',
+        memberSince: DateTime(2026, 4, 1),
+      );
+    }
+    rethrow;
+  }
 
   return UserProfileInfo(
     displayName: (data['displayName'] as String?)?.trim().isNotEmpty == true
@@ -289,11 +309,19 @@ final FutureProvider<WeeklySummaryData> weeklySummaryProvider =
   final int bestDay = stepsList.isEmpty ? 0 : stepsList.reduce(max);
   final int totalSteps = daily.fold<int>(0, (int sum, int v) => sum + v);
 
-  unawaited(_awardAchievementsIfNeeded(
-    uid: uid,
-    dailyGoal: ref.watch(profileControllerProvider).dailyStepGoal,
-    healthDocs: docs.docs,
-  ));
+  unawaited(() async {
+    try {
+      await _awardAchievementsIfNeeded(
+        uid: uid,
+        dailyGoal: ref.watch(profileControllerProvider).dailyStepGoal,
+        healthDocs: docs.docs,
+      );
+    } on FirebaseException catch (error) {
+      if (!_isFirestoreUnavailable(error)) {
+        rethrow;
+      }
+    }
+  }());
 
   return WeeklySummaryData(
     avgDailySteps: avgDailySteps,
@@ -320,12 +348,27 @@ final FutureProvider<List<AchievementStatus>> achievementsProvider =
         .toList();
   }
 
-  final QuerySnapshot<Map<String, dynamic>> docs = await FirebaseFirestore
-      .instance
-      .collection('users')
-      .doc(uid)
-      .collection('achievements')
-      .get();
+  final QuerySnapshot<Map<String, dynamic>> docs;
+  try {
+    docs = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('achievements')
+        .get();
+  } on FirebaseException catch (error) {
+    if (_isFirestoreUnavailable(error)) {
+      return _achievementDefinitions
+          .map((d) => AchievementStatus(
+                id: d.id,
+                name: d.name,
+                emoji: d.emoji,
+                description: d.description,
+                unlocked: false,
+              ))
+          .toList();
+    }
+    rethrow;
+  }
   final Map<String, Map<String, dynamic>> earned =
       <String, Map<String, dynamic>>{
     for (final QueryDocumentSnapshot<Map<String, dynamic>> d in docs.docs)
@@ -420,78 +463,90 @@ Future<void> _awardAchievementsIfNeeded({
   required int dailyGoal,
   required List<QueryDocumentSnapshot<Map<String, dynamic>>> healthDocs,
 }) async {
-  final CollectionReference<Map<String, dynamic>> achRef = FirebaseFirestore
-      .instance
-      .collection('users')
-      .doc(uid)
-      .collection('achievements');
+  try {
+    final CollectionReference<Map<String, dynamic>> achRef = FirebaseFirestore
+        .instance
+        .collection('users')
+        .doc(uid)
+        .collection('achievements');
 
-  final QuerySnapshot<Map<String, dynamic>> existingSnapshot =
-      await achRef.get();
-  final Set<String> existing = existingSnapshot.docs
-      .map((QueryDocumentSnapshot<Map<String, dynamic>> d) => d.id)
-      .toSet();
+    final QuerySnapshot<Map<String, dynamic>> existingSnapshot =
+        await achRef.get();
+    final Set<String> existing = existingSnapshot.docs
+        .map((QueryDocumentSnapshot<Map<String, dynamic>> d) => d.id)
+        .toSet();
 
-  final List<Map<String, dynamic>> health = healthDocs
-      .map((QueryDocumentSnapshot<Map<String, dynamic>> d) => d.data())
-      .toList();
-  final int totalSteps = health.fold<int>(
-      0,
-      (int sum, Map<String, dynamic> d) =>
-          sum + ((d['steps'] as num?)?.toInt() ?? 0));
-  final bool hasGoalCrusher = health.any((Map<String, dynamic> d) =>
-      ((d['steps'] as num?)?.toInt() ?? 0) >= dailyGoal);
-  final bool hasTenK = health.any((Map<String, dynamic> d) =>
-      ((d['steps'] as num?)?.toInt() ?? 0) >= 10000);
-  final bool hasHydration = health.any((Map<String, dynamic> d) {
-    final num? water = (d['water'] ?? d['waterGlasses']) as num?;
-    return (water?.toInt() ?? 0) >= 8;
-  });
+    final List<Map<String, dynamic>> health = healthDocs
+        .map((QueryDocumentSnapshot<Map<String, dynamic>> d) => d.data())
+        .toList();
+    final int totalSteps = health.fold<int>(
+        0,
+        (int sum, Map<String, dynamic> d) =>
+            sum + ((d['steps'] as num?)?.toInt() ?? 0));
+    final bool hasGoalCrusher = health.any((Map<String, dynamic> d) =>
+        ((d['steps'] as num?)?.toInt() ?? 0) >= dailyGoal);
+    final bool hasTenK = health.any((Map<String, dynamic> d) =>
+        ((d['steps'] as num?)?.toInt() ?? 0) >= 10000);
+    final bool hasHydration = health.any((Map<String, dynamic> d) {
+      final num? water = (d['water'] ?? d['waterGlasses']) as num?;
+      return (water?.toInt() ?? 0) >= 8;
+    });
 
-  final bool hasEarlyBird = health.any((Map<String, dynamic> d) {
-    final int steps = (d['steps'] as num?)?.toInt() ?? 0;
-    final DateTime? dt =
-        _toDateTime(d['updatedAt']) ?? _toDateTime(d['createdAt']);
-    return steps > 0 && dt != null && dt.hour < 8;
-  });
+    final bool hasEarlyBird = health.any((Map<String, dynamic> d) {
+      final int steps = (d['steps'] as num?)?.toInt() ?? 0;
+      final DateTime? dt =
+          _toDateTime(d['updatedAt']) ?? _toDateTime(d['createdAt']);
+      return steps > 0 && dt != null && dt.hour < 8;
+    });
 
-  final Map<String, bool> activeByDate = <String, bool>{
-    for (final Map<String, dynamic> d in health)
-      if (d['date'] is String)
-        d['date'] as String: ((d['steps'] as num?)?.toInt() ?? 0) > 500,
-  };
-  bool weekWarrior = true;
-  for (int i = 0; i < 7; i++) {
-    final DateTime day = DateTime.now().subtract(Duration(days: i));
-    final String key = DateFormat('yyyy-MM-dd').format(day);
-    if (!(activeByDate[key] ?? false)) {
-      weekWarrior = false;
-      break;
+    final Map<String, bool> activeByDate = <String, bool>{
+      for (final Map<String, dynamic> d in health)
+        if (d['date'] is String)
+          d['date'] as String: ((d['steps'] as num?)?.toInt() ?? 0) > 500,
+    };
+    bool weekWarrior = true;
+    for (int i = 0; i < 7; i++) {
+      final DateTime day = DateTime.now().subtract(Duration(days: i));
+      final String key = DateFormat('yyyy-MM-dd').format(day);
+      if (!(activeByDate[key] ?? false)) {
+        weekWarrior = false;
+        break;
+      }
+    }
+
+    final Map<String, bool> unlockedRules = <String, bool>{
+      'first_steps': totalSteps > 0,
+      'goal_crusher': hasGoalCrusher,
+      'week_warrior': weekWarrior,
+      'hydration_hero': hasHydration,
+      'early_bird': hasEarlyBird,
+      'ten_k_club': hasTenK,
+    };
+
+    final WriteBatch batch = FirebaseFirestore.instance.batch();
+    bool hasWrites = false;
+    for (final _AchievementDefinition def in _achievementDefinitions) {
+      if ((unlockedRules[def.id] ?? false) && !existing.contains(def.id)) {
+        hasWrites = true;
+        batch.set(achRef.doc(def.id), <String, dynamic>{
+          'earnedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+    if (hasWrites) {
+      await batch.commit();
+    }
+  } on FirebaseException catch (error) {
+    if (!_isFirestoreUnavailable(error)) {
+      rethrow;
     }
   }
+}
 
-  final Map<String, bool> unlockedRules = <String, bool>{
-    'first_steps': totalSteps > 0,
-    'goal_crusher': hasGoalCrusher,
-    'week_warrior': weekWarrior,
-    'hydration_hero': hasHydration,
-    'early_bird': hasEarlyBird,
-    'ten_k_club': hasTenK,
-  };
-
-  final WriteBatch batch = FirebaseFirestore.instance.batch();
-  bool hasWrites = false;
-  for (final _AchievementDefinition def in _achievementDefinitions) {
-    if ((unlockedRules[def.id] ?? false) && !existing.contains(def.id)) {
-      hasWrites = true;
-      batch.set(achRef.doc(def.id), <String, dynamic>{
-        'earnedAt': FieldValue.serverTimestamp(),
-      });
-    }
-  }
-  if (hasWrites) {
-    await batch.commit();
-  }
+bool _isFirestoreUnavailable(FirebaseException error) {
+  return error.code == 'unavailable' ||
+      error.code == 'deadline-exceeded' ||
+      error.code == 'network-request-failed';
 }
 
 DateTime? _toDateTime(Object? value) {

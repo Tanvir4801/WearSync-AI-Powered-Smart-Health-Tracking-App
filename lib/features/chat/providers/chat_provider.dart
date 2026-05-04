@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../services/ai/hf_ai_service.dart';
 import '../models/chat_message.dart';
+import '../services/ai_service.dart';
 
 part 'chat_provider.g.dart';
 

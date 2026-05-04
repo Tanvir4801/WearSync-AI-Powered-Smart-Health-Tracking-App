@@ -153,8 +153,8 @@ class SmartwearAiApp extends StatelessWidget {
           backgroundColor: AppTheme.surface,
           indicatorColor: AppTheme.primaryAccent.withValues(alpha: 0.15),
           labelTextStyle: WidgetStateProperty.resolveWith<TextStyle?>(
-            (Set<MaterialState> states) {
-              if (states.contains(MaterialState.selected)) {
+            (Set<WidgetState> states) {
+              if (states.contains(WidgetState.selected)) {
                 return const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -169,8 +169,8 @@ class SmartwearAiApp extends StatelessWidget {
             },
           ),
           iconTheme: WidgetStateProperty.resolveWith<IconThemeData?>(
-            (Set<MaterialState> states) {
-              if (states.contains(MaterialState.selected)) {
+            (Set<WidgetState> states) {
+              if (states.contains(WidgetState.selected)) {
                 return const IconThemeData(
                   color: Color(0xFF6366F1),
                   size: 24,

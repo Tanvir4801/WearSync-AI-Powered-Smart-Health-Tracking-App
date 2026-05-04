@@ -237,7 +237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   Navigator.of(context).pop();
                   Navigator.of(this.context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => WorkoutTimerScreen(option: option),
+                      builder: (_) => _WorkoutTimerScreen(option: option),
                     ),
                   );
                 },
@@ -865,16 +865,16 @@ const List<_WorkoutOption> _workouts = <_WorkoutOption>[
   ),
 ];
 
-class WorkoutTimerScreen extends StatefulWidget {
-  const WorkoutTimerScreen({super.key, required this.option});
+class _WorkoutTimerScreen extends StatefulWidget {
+  const _WorkoutTimerScreen({required this.option});
 
   final _WorkoutOption option;
 
   @override
-  State<WorkoutTimerScreen> createState() => _WorkoutTimerScreenState();
+  State<_WorkoutTimerScreen> createState() => _WorkoutTimerScreenState();
 }
 
-class _WorkoutTimerScreenState extends State<WorkoutTimerScreen> {
+class _WorkoutTimerScreenState extends State<_WorkoutTimerScreen> {
   late final DateTime _startTime;
   late final Timer _timer;
   Duration _elapsed = Duration.zero;
